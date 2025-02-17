@@ -1,0 +1,48 @@
+[
+    {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Please enter your canteen's ID as listed on OpenMensa (https://openmensa.org/c/ID)"
+      },
+      {
+        "type": "input",
+        "messageKey": "openmensaID",
+        "label": "OpenMensa ID",
+        "attributes": {
+          "placeholder": "ID",
+          "type": "number"
+        }
+      },
+      {
+        "type": "radiogroup",
+        "messageKey": "MEAL_PRICE",
+        "label": "Select your meal price category",
+        "defaultValue": "students",
+        "options": [
+          { 
+            "label": "Student",
+            "value": "students"
+          },
+          { 
+            "label": "Employee",
+            "value": "employees"
+          },
+          { 
+            "label": "Pupil",
+            "value": "pupils"
+          },
+          { 
+            "label": "Other",
+            "value": "others"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "submit",
+    "defaultValue": "Save"
+  }
+]

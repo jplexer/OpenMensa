@@ -1,0 +1,65 @@
+{
+  "name": "openmensa",
+  "author": "JPlexer",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
+  "pebble": {
+    "displayName": "OpenMensa",
+    "uuid": "d6ff77cb-4bd1-4e03-a219-c5c5c214a2db",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "ERROR_MSG",
+      "openmensaID",
+      "MEAL_PRICE",
+      "DAY_LIST",
+      "WEEKDAY_LIST",
+      "SELECTED_DATE",
+      "MEALS_IDS",
+      "MEALS_NAMES",
+      "MEALS_PRICES",
+      "MEAL_ID",
+      "MEAL_INFO"
+    ],
+    "resources": {
+      "media": [
+        {
+          "menuIcon": true,
+          "type": "png",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu_icon.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_POT",
+          "file": "images/pot.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_VEGAN",
+          "file": "images/vegan.png"
+        },
+        {
+          "type": "png",
+          "name": "IMAGE_VEGETARIAN",
+          "file": "images/vegetarian.png"
+        }
+      ]
+    }
+  }
+}
