@@ -367,51 +367,6 @@ static void show_error_window(const char *error_msg) {
   window_stack_push(s_error_window, true);
 }
 
-// A helper to extract a JSON field value from a simple JSON string.
-// Expects the field name to be in quotes, e.g. "name":"Meal name"
-// Copies the field value into dest (dest_size bytes max).
-static void extract_json_field(const char *json, const char *field, char *dest, size_t dest_size) {
-  dest[0] = '\0';
-  char search_str[32];
-  snprintf(search_str, sizeof(search_str), "\"%s\"", field);
-  char *field_loc = strstr(json, search_str);
-  if (field_loc) {
-    // Find the colon following the field name.
-    char *colon = strchr(field_loc, ':');
-    if (colon) {
-      colon++;
-      // Skip any spaces.
-      while(*colon == ' ') {
-        colon++;
-      }
-      if (*colon == '\"') {
-        // Field value is a quoted string.
-        colon++;
-        char *end_quote = strchr(colon, '\"');
-        if (end_quote) {
-          size_t len = end_quote - colon;
-          if (len >= dest_size) {
-            len = dest_size - 1;
-          }
-          strncpy(dest, colon, len);
-          dest[len] = '\0';
-        }
-      } else if (*colon == '[') {
-        // Field value is an array. Copy until the closing bracket.
-        char *end_bracket = strchr(colon, ']');
-        if (end_bracket) {
-          size_t len = end_bracket - colon + 1;
-          if (len >= dest_size) {
-            len = dest_size - 1;
-          }
-          strncpy(dest, colon, len);
-          dest[len] = '\0';
-        }
-      }
-    }
-  }
-}
-
 // Create the meal info window that displays the info on a TextLayer.
 static void meal_info_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
@@ -486,26 +441,8 @@ static void meal_info_window_unload(Window *window) {
   s_meal_info_window = NULL;
 }
 
-static void show_meal_info_window(const char *json) {
-  char name[128] = "";
-  char price[64] = "";
-  char notes[256] = "";
-  
-  extract_json_field(json, "name", name, sizeof(name));
-  extract_json_field(json, "price", price, sizeof(price));
-  extract_json_field(json, "notes", notes, sizeof(notes));
-  
-  // Remove unwanted characters from notes (allergens).
-  int i, j = 0;
-  for (i = 0; notes[i] != '\0'; i++) {
-    if (notes[i] != '[' && notes[i] != ']' && notes[i] != '"') {
-      notes[j++] = notes[i];
-    }
-  }
-  notes[j] = '\0';
-
-  // For now, simply copy notes (the JSON array) as allergens.
-  // You can refine processing later.
+static void show_meal_info_window_separated(const char *name, const char *price, const char *notes) {
+  // Copy individual fields into our global strings.
   strncpy(s_meal_info_name, name, sizeof(s_meal_info_name) - 1);
   s_meal_info_name[sizeof(s_meal_info_name) - 1] = '\0';
   
@@ -515,12 +452,19 @@ static void show_meal_info_window(const char *json) {
   strncpy(s_meal_info_allergens, notes, sizeof(s_meal_info_allergens) - 1);
   s_meal_info_allergens[sizeof(s_meal_info_allergens) - 1] = '\0';
   
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "s_meal_info_name: %s", s_meal_info_name);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "s_meal_info_price: %s", s_meal_info_price);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "s_meal_info_allergens: %s", s_meal_info_allergens);
+  
   s_meal_info_window = window_create();
+  if (!s_meal_info_window) {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Failed to create meal info window");
+    return;
+  }
   window_set_window_handlers(s_meal_info_window, (WindowHandlers) {
     .load = meal_info_window_load,
     .unload = meal_info_window_unload,
   });
-  
   window_stack_push(s_meal_info_window, true);
 }
 
@@ -537,11 +481,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   Tuple *meals_ids_tuple = dict_find(iterator, MESSAGE_KEY_MEALS_IDS);
   Tuple *meals_names_tuple = dict_find(iterator, MESSAGE_KEY_MEALS_NAMES);
   Tuple *meals_prices_tuple = dict_find(iterator, MESSAGE_KEY_MEALS_PRICES);
-  Tuple *meal_info_tuple = dict_find(iterator, MESSAGE_KEY_MEAL_INFO);
-  if (meal_info_tuple) {
-    show_meal_info_window(meal_info_tuple->value->cstring);
-  }
+  Tuple *meal_name_tuple = dict_find(iterator, MESSAGE_KEY_MEAL_NAME);
+  Tuple *meal_price_tuple = dict_find(iterator, MESSAGE_KEY_MEAL_PRICE);
+  Tuple *meal_notes_tuple = dict_find(iterator, MESSAGE_KEY_MEAL_NOTES);
   
+  // Use separate field messages if available.
+  if (meal_name_tuple && meal_price_tuple && meal_notes_tuple) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Showing meal info window");
+    show_meal_info_window_separated(meal_name_tuple->value->cstring,
+                                    meal_price_tuple->value->cstring,
+                                    meal_notes_tuple->value->cstring);
+  }
+
   if (day_list_tuple) {
     // Free old day titles.
     for (int i = 0; i < s_menu_item_count; i++) {
@@ -558,78 +509,78 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
   
   if (meals_ids_tuple && meals_names_tuple && meals_prices_tuple) {
-  // Free previous meal data.
-  for (int i = 0; i < s_meal_count; i++) {
-    free(s_meal_titles[i]);
-    free(s_meal_subtitles[i]);
-    if (s_meal_bitmaps[i]) {
-      gbitmap_destroy(s_meal_bitmaps[i]);
-      s_meal_bitmaps[i] = NULL;
+    // Free previous meal data.
+    for (int i = 0; i < s_meal_count; i++) {
+      free(s_meal_titles[i]);
+      free(s_meal_subtitles[i]);
+      if (s_meal_bitmaps[i]) {
+        gbitmap_destroy(s_meal_bitmaps[i]);
+        s_meal_bitmaps[i] = NULL;
+      }
     }
-  }
-  int count_ids = parse_int_array(meals_ids_tuple->value->cstring, s_meal_ids, MAX_MEALS);
-  int count_names = parse_string_array(meals_names_tuple->value->cstring, s_meal_titles, MAX_MEALS);
-  int count_prices = parse_string_array(meals_prices_tuple->value->cstring, s_meal_subtitles, MAX_MEALS);
-  
-  // Use the minimum count among the arrays.
-  s_meal_count = count_ids;
-  if (count_names < s_meal_count) s_meal_count = count_names;
-  if (count_prices < s_meal_count) s_meal_count = count_prices;
-  
-  // Process each meal title.
-  for (int i = 0; i < s_meal_count; i++) {
-    char *name = s_meal_titles[i];
-    // Check for prefix ("Vegan" or "Vegetarian") to remove if present.
-    if (strncasecmp(name, "vegan:", 6) == 0 || (strncasecmp(name, "vegan", 5) == 0 && (name[5]==' ' || name[5]==':'))) {
-      char *p = name;
-      if (strncasecmp(p, "vegan:", 6)==0) {
-        p += 6;
+    int count_ids = parse_int_array(meals_ids_tuple->value->cstring, s_meal_ids, MAX_MEALS);
+    int count_names = parse_string_array(meals_names_tuple->value->cstring, s_meal_titles, MAX_MEALS);
+    int count_prices = parse_string_array(meals_prices_tuple->value->cstring, s_meal_subtitles, MAX_MEALS);
+    
+    // Use the minimum count among the arrays.
+    s_meal_count = count_ids;
+    if (count_names < s_meal_count) s_meal_count = count_names;
+    if (count_prices < s_meal_count) s_meal_count = count_prices;
+    
+    // Process each meal title.
+    for (int i = 0; i < s_meal_count; i++) {
+      char *name = s_meal_titles[i];
+      // Check for prefix ("Vegan" or "Vegetarian") to remove if present.
+      if (strncasecmp(name, "vegan:", 6) == 0 || (strncasecmp(name, "vegan", 5) == 0 && (name[5]==' ' || name[5]==':'))) {
+        char *p = name;
+        if (strncasecmp(p, "vegan:", 6)==0) {
+          p += 6;
+        } else {
+          p += 5;
+        }
+        while (*p == ' ' || *p == ':') { p++; }
+        memmove(name, p, strlen(p)+1);
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGAN);
+      } else if (strncasecmp(name, "vegetarian:", 11) == 0 || (strncasecmp(name, "vegetarian", 10) == 0 && (name[10]==' ' || name[10]==':'))) {
+        char *p = name;
+        if (strncasecmp(p, "vegetarian:", 11) == 0) {
+          p += 11;
+        } else {
+          p += 10;
+        }
+        while (*p == ' ' || *p == ':') { p++; }
+        memmove(name, p, strlen(p)+1);
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
+      } else if (strncasecmp(name, "vegetarisch:", 13) == 0 || (strncasecmp(name, "vegetarisch", 12) == 0 && (name[12]==' ' || name[12]==':'))) {
+        char *p = name;
+        if (strncasecmp(p, "vegetarisch:", 13) == 0) {
+          p += 13;
+        } else {
+          p += 12;
+        }
+        while (*p == ' ' || *p == ':') { p++; }
+        memmove(name, p, strlen(p)+1);
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
+      } else if (strcasestr(name, "vegan") != NULL) {
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGAN);
+      } else if (strcasestr(name, "vegetarian") != NULL || strcasestr(name, "vegetarisch") != NULL) {
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
       } else {
-        p += 5;
+        s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_POT);
       }
-      while (*p == ' ' || *p == ':') { p++; }
-      memmove(name, p, strlen(p)+1);
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGAN);
-    } else if (strncasecmp(name, "vegetarian:", 11) == 0 || (strncasecmp(name, "vegetarian", 10) == 0 && (name[10]==' ' || name[10]==':'))) {
-      char *p = name;
-      if (strncasecmp(p, "vegetarian:", 11) == 0) {
-        p += 11;
-      } else {
-        p += 10;
-      }
-      while (*p == ' ' || *p == ':') { p++; }
-      memmove(name, p, strlen(p)+1);
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
-    } else if (strncasecmp(name, "vegetarisch:", 13) == 0 || (strncasecmp(name, "vegetarisch", 12) == 0 && (name[12]==' ' || name[12]==':'))) {
-      char *p = name;
-      if (strncasecmp(p, "vegetarisch:", 13) == 0) {
-        p += 13;
-      } else {
-        p += 12;
-      }
-      while (*p == ' ' || *p == ':') { p++; }
-      memmove(name, p, strlen(p)+1);
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
-    } else if (strcasestr(name, "vegan") != NULL) {
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGAN);
-    } else if (strcasestr(name, "vegetarian") != NULL || strcasestr(name, "vegetarisch") != NULL) {
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
+    }
+    
+    if (!s_meals_window) {
+      create_meals_window();
     } else {
-      s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_POT);
+      // If meals window already exists, reload its menu data.
+      if(s_meals_menu_layer != NULL) {
+        menu_layer_reload_data(s_meals_menu_layer);
+      }
     }
+    window_stack_push(s_meals_window, true);
+    window_stack_push(s_meals_window, true);
   }
-  
-  if (!s_meals_window) {
-  create_meals_window();
-} else {
-  // If meals window already exists, reload its menu data.
-  if(s_meals_menu_layer != NULL) {
-    menu_layer_reload_data(s_meals_menu_layer);
-  }
-}
-window_stack_push(s_meals_window, true);
-  window_stack_push(s_meals_window, true);
-}
   
   menu_layer_reload_data(s_menu_layer);
 }

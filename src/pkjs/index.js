@@ -161,21 +161,22 @@ Pebble.addEventListener("appmessage", function(e) {
       var pricingCategory = localStorage.getItem("MEAL_PRICE") || "students";
       var singlePrice = (mealInfo.prices && mealInfo.prices[pricingCategory]) ?
                            mealInfo.prices[pricingCategory].toFixed(2) + "€" : "N/A";
-      // Build a simplified object that includes the basic meal info and price only.
-      var simplifiedMeal = {
-         id: mealInfo.id,
-         name: mealInfo.name,
-         price: singlePrice,
-         notes: mealInfo.notes
+      var notes = ""
+      mealInfo.notes.forEach(function(note) {
+        notes += note + ", ";
+      });
+      //remove trailing comma
+      notes = notes.replace(/,\s*$/, "");
+      var payload = {
+        "MEAL_NAME": mealInfo.name,
+        "MEAL_PRICE": singlePrice,
+        "MEAL_NOTES": notes
       };
-      Pebble.sendAppMessage({ "MEAL_INFO": JSON.stringify(simplifiedMeal) },
-          function(e) {
-            //console.log("Sent meal info:", JSON.stringify(simplifiedMeal));
-          },
-          function(e) {
-            console.log("Failed to send meal info.");
-          }
-      );
+      Pebble.sendAppMessage(payload, function(e) {
+        //console.log("Single meal payload sent:", JSON.stringify(payload));
+      }, function(e) {
+        console.log("Single meal payload send failed");
+      });
     } else {
       console.log("Meal not found for id:", selectedMealId);
     }

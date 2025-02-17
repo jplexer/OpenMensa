@@ -1,7 +1,7 @@
 {
   "name": "openmensa",
   "author": "JPlexer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "keywords": [
     "pebble-app"
   ],
@@ -34,7 +34,9 @@
       "MEALS_NAMES",
       "MEALS_PRICES",
       "MEAL_ID",
-      "MEAL_INFO"
+      "MEAL_NAME",
+      "MEAL_PRICE",
+      "MEAL_NOTES"
     ],
     "resources": {
       "media": [
