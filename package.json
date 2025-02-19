@@ -1,7 +1,7 @@
 {
   "name": "openmensa",
   "author": "JPlexer",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "keywords": [
     "pebble-app"
   ],
@@ -24,6 +24,8 @@
       "watchface": false
     },
     "messageKeys": [
+      "RELOAD_APP",
+      "RELOAD_DONE",
       "ERROR_MSG",
       "openmensaID",
       "MEAL_PRICE",

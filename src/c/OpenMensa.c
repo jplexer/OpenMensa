@@ -32,7 +32,6 @@ static MenuLayer *s_meals_menu_layer;
 static Window *s_error_window = NULL;
 static TextLayer *s_error_text_layer = NULL;
 static Window *s_meal_info_window = NULL;
-static TextLayer *s_meal_info_text_layer = NULL;
 
 static char s_meal_info_name[128] = "";
 static char s_meal_info_price[64] = "";
@@ -468,7 +467,74 @@ static void show_meal_info_window_separated(const char *name, const char *price,
   window_stack_push(s_meal_info_window, true);
 }
 
+static void prv_window_load(Window *window) {
+  Layer *window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(window_layer);
+
+  s_menu_layer = menu_layer_create(bounds);
+  menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks){
+    .get_num_sections = menu_get_num_sections_callback,
+    .get_num_rows = menu_get_num_rows_callback,
+    .draw_row = menu_draw_row_callback,
+    .select_click = menu_selection_callback
+  });
+  menu_layer_set_click_config_onto_window(s_menu_layer, window);
+  layer_add_child(window_layer, menu_layer_get_layer(s_menu_layer));
+}
+
+static void prv_window_unload(Window *window) {
+  menu_layer_destroy(s_menu_layer);
+}
+
+static void reload_app_callback(void *data) {
+  // If an old main window exists, destroy it. also destroy the meals window, meal info window or error window if they exist.
+  if (s_error_window) {
+    window_stack_remove(s_error_window, false);
+    window_destroy(s_error_window);
+    s_error_window = NULL;
+  }
+  if (s_meals_window) {
+    window_stack_remove(s_meals_window, false);
+    window_destroy(s_meals_window);
+    s_meals_window = NULL;
+  }
+  if (s_meal_info_window) {
+    window_stack_remove(s_meal_info_window, false);
+    window_destroy(s_meal_info_window);
+    s_meal_info_window = NULL;
+  }
+  if (s_window) {
+    window_stack_remove(s_window, false);
+    window_destroy(s_window);
+  }
+
+  s_window = window_create();
+  window_set_window_handlers(s_window, (WindowHandlers) {
+    .load = prv_window_load,
+    .unload = prv_window_unload,
+  });
+  window_stack_push(s_window, true);
+  // Send a message that the reload is complete.
+  DictionaryIterator *out_iter;
+  AppMessageResult result = app_message_outbox_begin(&out_iter);
+  if(result == APP_MSG_OK) {
+    dict_write_int(out_iter, MESSAGE_KEY_RELOAD_DONE, &(int){1}, sizeof(int), true);
+    dict_write_end(out_iter);
+    app_message_outbox_send();
+  } else {
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Error sending reload complete message: %d", (int)result);
+  }
+}
+
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+
+  Tuple *reload_tuple = dict_find(iterator, MESSAGE_KEY_RELOAD_APP);
+  if (reload_tuple) {
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Reload message received; restarting app");
+    app_timer_register(100, reload_app_callback, NULL);
+    return;
+  }
+
   // Check for an error message first.
   Tuple *error_tuple = dict_find(iterator, MESSAGE_KEY_ERROR_MSG);
   if (error_tuple) {
@@ -583,25 +649,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
   
   menu_layer_reload_data(s_menu_layer);
-}
-
-static void prv_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
-
-  s_menu_layer = menu_layer_create(bounds);
-  menu_layer_set_callbacks(s_menu_layer, NULL, (MenuLayerCallbacks){
-    .get_num_sections = menu_get_num_sections_callback,
-    .get_num_rows = menu_get_num_rows_callback,
-    .draw_row = menu_draw_row_callback,
-    .select_click = menu_selection_callback
-  });
-  menu_layer_set_click_config_onto_window(s_menu_layer, window);
-  layer_add_child(window_layer, menu_layer_get_layer(s_menu_layer));
-}
-
-static void prv_window_unload(Window *window) {
-  menu_layer_destroy(s_menu_layer);
 }
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
