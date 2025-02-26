@@ -597,7 +597,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     for (int i = 0; i < s_meal_count; i++) {
       char *name = s_meal_titles[i];
       // Check for prefix ("Vegan" or "Vegetarian") to remove if present.
-      if (strncasecmp(name, "vegan:", 6) == 0 || (strncasecmp(name, "vegan", 5) == 0 && (name[5]==' ' || name[5]==':'))) {
+      if ((strncasecmp(name, "vegan", 5) == 0 && (name[5]==' ' || name[5]==':'))) {
         char *p = name;
         if (strncasecmp(p, "vegan:", 6)==0) {
           p += 6;
@@ -607,7 +607,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         while (*p == ' ' || *p == ':') { p++; }
         memmove(name, p, strlen(p)+1);
         s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGAN);
-      } else if (strncasecmp(name, "vegetarian:", 11) == 0 || (strncasecmp(name, "vegetarian", 10) == 0 && (name[10]==' ' || name[10]==':'))) {
+      } else if ((strncasecmp(name, "vegetarian", 10) == 0 && (name[10]==' ' || name[10]==':'))) {
         char *p = name;
         if (strncasecmp(p, "vegetarian:", 11) == 0) {
           p += 11;
@@ -617,12 +617,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         while (*p == ' ' || *p == ':') { p++; }
         memmove(name, p, strlen(p)+1);
         s_meal_bitmaps[i] = gbitmap_create_with_resource(IMAGE_VEGETARIAN);
-      } else if (strncasecmp(name, "vegetarisch:", 13) == 0 || (strncasecmp(name, "vegetarisch", 12) == 0 && (name[12]==' ' || name[12]==':'))) {
+      } else if ((strncasecmp(name, "vegetarisch", 11) == 0 && (name[11]==' ' || name[11]==':'))) {
         char *p = name;
-        if (strncasecmp(p, "vegetarisch:", 13) == 0) {
-          p += 13;
-        } else {
+        if (strncasecmp(p, "vegetarisch:", 12) == 0) {
           p += 12;
+        } else {
+          p += 11;
         }
         while (*p == ' ' || *p == ':') { p++; }
         memmove(name, p, strlen(p)+1);
